@@ -1,4 +1,4 @@
-import { PropsWithChildren } from "react";
+import { PropsWithChildren, TdHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 export function Table({ children }: PropsWithChildren) {
@@ -36,13 +36,17 @@ export function TBody({ children }: PropsWithChildren) {
   return <tbody className="divide-y divide-slate-200">{children}</tbody>;
 }
 
-export function Td({
-  children,
-  align = "left",
-  className,
-}: PropsWithChildren<{ align?: "left" | "center" | "right"; className?: string }>) {
+type TdProps = PropsWithChildren<
+  {
+    align?: "left" | "center" | "right";
+    className?: string;
+  } & TdHTMLAttributes<HTMLTableCellElement>
+>;
+
+export function Td({ children, align = "left", className, ...rest }: TdProps) {
   return (
     <td
+      {...rest}
       className={cn(
         "px-4 py-3 text-sm text-slate-700",
         align === "center" && "text-center",
