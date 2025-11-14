@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   const { data: profile } = await supabase
     .from("users")
     .select("role")
-    .eq("auth_user_id", data.user.id)
+    .eq("auth_user_id", data.user.id as string)
     .eq("is_active", true)
     .maybeSingle();
 
