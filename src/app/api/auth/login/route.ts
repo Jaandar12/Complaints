@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/types/database";
+import { UserRole } from "@/lib/types";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -26,7 +27,8 @@ export async function POST(request: Request) {
   }
   type AuthUserIdType = NonNullable<Database["public"]["Tables"]["users"]["Row"]["auth_user_id"]>;
 
-  const { data: profile } = await (supabase.from("users") as any)
+  const { data: profile } = await supabase
+    .from("users")
     .select("role")
     .eq(AUTH_USER_ID_COLUMN, authUserId as AuthUserIdType)
     .eq(IS_ACTIVE_COLUMN, true)
@@ -39,7 +41,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const redirectTo = profile.role === "SERVICE_WORKER" ? "/worker" : "/admin";
+  type ProfileRow = { role: UserRole };
+  const profileRow = profile as ProfileRow;
+
+  const redirectTo = profileRow.role === "SERVICE_WORKER" ? "/worker" : "/admin";
 
   return NextResponse.json({ redirectTo });
 }

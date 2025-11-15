@@ -74,8 +74,11 @@ export async function POST(request: Request) {
     status: "NEW",
   };
 
-  const { data: complaint, error: insertError } = await (supabase.from("complaints") as any)
-    .insert([complaintPayload])
+  // @ts-ignore -- Supabase type inference fails for typed insert payloads
+  const { data: complaint, error: insertError } = await supabase
+    .from("complaints")
+    // @ts-ignore -- Supabase typing bug for typed inserts
+    .insert<ComplaintInsert>(complaintPayload)
     .select("id")
     .single();
 
@@ -84,22 +87,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to create complaint." }, { status: 500 });
   }
 
+  type ComplaintRow = { id: string };
+  const complaintRow = complaint as ComplaintRow;
+
   type ComplaintCategoryLinkInsert = Database["public"]["Tables"]["complaint_category_links"]["Insert"];
   const categoryLinkPayload: ComplaintCategoryLinkInsert[] = payload.data.categories.map((categoryId) => ({
-    complaint_id: complaint.id,
+    complaint_id: complaintRow.id,
     category_id: categoryId,
   }));
 
-  await (supabase.from("complaint_category_links") as any).insert(categoryLinkPayload);
+  await supabase
+    .from("complaint_category_links")
+    // @ts-ignore -- Supabase typing bug for typed inserts
+    .insert<ComplaintCategoryLinkInsert>(categoryLinkPayload);
 
   type ComplaintStatusLogInsert = Database["public"]["Tables"]["complaint_status_logs"]["Insert"];
   const statusLogPayload: ComplaintStatusLogInsert = {
-    complaint_id: complaint.id,
+    complaint_id: complaintRow.id,
     new_status: "NEW",
     note: "Tenant submitted complaint.",
   };
 
-  await (supabase.from("complaint_status_logs") as any).insert([statusLogPayload]);
+  await supabase
+    .from("complaint_status_logs")
+    // @ts-ignore -- Supabase typing bug for typed inserts
+    .insert<ComplaintStatusLogInsert>([statusLogPayload]);
 
-  return NextResponse.json({ id: complaint.id });
+  return NextResponse.json({ id: complaintRow.id });
 }

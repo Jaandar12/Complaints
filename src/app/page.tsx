@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { Building2, QrCode } from "lucide-react";
 import Link from "next/link";
 
@@ -17,15 +16,9 @@ export default function Home() {
             Every unit has a QR code that opens a secure, unit-specific complaint portal. Management teams track issues,
             route work orders, and close the feedback loop with analytics-grade visibility.
           </p>
-          <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+          <div className="flex flex-col items-center justify-center">
             <Link
-              href="/unit/demo-unit"
-              className="w-48 rounded-full bg-blue-600 px-6 py-3 text-center text-sm font-semibold text-white shadow transition hover:bg-blue-500"
-            >
-              Preview Tenant Portal
-            </Link>
-            <Link
-              href="/admin"
+              href="/login"
               className="w-48 rounded-full border border-white/30 bg-white/10 px-6 py-3 text-center text-sm font-semibold text-white shadow transition hover:bg-white/20"
             >
               Launch Admin Console

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { UserRole } from "@/lib/types";
 import { isSupabaseConfigured } from "@/lib/env";
+import type { Database } from "@/lib/types/database";
 
 export type SessionUser = {
   id: string;
@@ -31,7 +32,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     return null;
   }
 
-  const usersTable = supabase.from("users") as any;
+  const usersTable = supabase.from("users");
   const { data: profile } = await usersTable
     .select("id, full_name, role")
     .eq("auth_user_id", user.id)
@@ -42,11 +43,14 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     return null;
   }
 
+  type ProfileRow = Database["public"]["Tables"]["users"]["Row"];
+  const profileRow = profile as ProfileRow;
+
   return {
-    id: profile.id,
+    id: profileRow.id,
     email: user.email ?? "",
-    role: profile.role as UserRole,
-    fullName: profile.full_name,
+    role: profileRow.role as UserRole,
+    fullName: profileRow.full_name,
   };
 }
 
