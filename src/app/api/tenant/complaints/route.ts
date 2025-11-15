@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/env";
+import type { Database } from "@/lib/types/database";
 
 const bodySchema = z.object({
   unitPublicId: z.string().uuid(),
@@ -32,11 +33,17 @@ export async function POST(request: Request) {
 
   const supabase = createSupabaseAdminClient();
 
+  type UnitLookup = {
+    id: string;
+    building_id: string;
+    is_blocked: boolean;
+  };
+
   const { data: unit, error: unitError } = await supabase
     .from("units")
     .select("id, building_id, is_blocked")
     .eq("public_id", payload.data.unitPublicId)
-    .single();
+    .single<UnitLookup>();
 
   if (unitError || !unit) {
     return NextResponse.json({ error: "Unit not found." }, { status: 404 });
@@ -57,16 +64,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "There is already an active complaint for this unit." }, { status: 409 });
   }
 
-  const { data: complaint, error: insertError } = await supabase
-    .from("complaints")
-    .insert({
-      unit_id: unit.id,
-      building_id: unit.building_id,
-      tenant_name: payload.data.tenantName,
-      tenant_contact: { contact: payload.data.tenantContact },
-      description: payload.data.description,
-      status: "NEW",
-    })
+  type ComplaintInsert = Database["public"]["Tables"]["complaints"]["Insert"];
+  const complaintPayload: ComplaintInsert = {
+    unit_id: unit.id,
+    building_id: unit.building_id,
+    tenant_name: payload.data.tenantName,
+    tenant_contact: { contact: payload.data.tenantContact },
+    description: payload.data.description,
+    status: "NEW",
+  };
+
+  const { data: complaint, error: insertError } = await (supabase.from("complaints") as any)
+    .insert([complaintPayload])
     .select("id")
     .single();
 
@@ -75,18 +84,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to create complaint." }, { status: 500 });
   }
 
-  await supabase.from("complaint_category_links").insert(
-    payload.data.categories.map((categoryId) => ({
-      complaint_id: complaint.id,
-      category_id: categoryId,
-    }))
-  );
+  type ComplaintCategoryLinkInsert = Database["public"]["Tables"]["complaint_category_links"]["Insert"];
+  const categoryLinkPayload: ComplaintCategoryLinkInsert[] = payload.data.categories.map((categoryId) => ({
+    complaint_id: complaint.id,
+    category_id: categoryId,
+  }));
 
-  await supabase.from("complaint_status_logs").insert({
+  await (supabase.from("complaint_category_links") as any).insert(categoryLinkPayload);
+
+  type ComplaintStatusLogInsert = Database["public"]["Tables"]["complaint_status_logs"]["Insert"];
+  const statusLogPayload: ComplaintStatusLogInsert = {
     complaint_id: complaint.id,
     new_status: "NEW",
     note: "Tenant submitted complaint.",
-  });
+  };
+
+  await (supabase.from("complaint_status_logs") as any).insert([statusLogPayload]);
 
   return NextResponse.json({ id: complaint.id });
 }

@@ -31,6 +31,12 @@ export async function getServiceWorkers(): Promise<WorkerSummary[]> {
   }
 
   const supabase = createSupabaseAdminClient();
+  type WorkerRow = {
+    id: string;
+    full_name: string | null;
+    service_worker_type: string | null;
+  };
+
   const { data: workers, error } = await supabase
     .from("users")
     .select("id, full_name, service_worker_type")
@@ -42,14 +48,21 @@ export async function getServiceWorkers(): Promise<WorkerSummary[]> {
     return [];
   }
 
-  const workerIds = workers.map((worker) => worker.id);
+  const workerRecords = workers as WorkerRow[];
+  const workerIds = workerRecords.map((worker) => worker.id);
+  type WorkloadRow = {
+    worker_id: string;
+    status: ComplaintStatus;
+    created_at: string;
+  };
+
   const { data: workload } = await supabase
     .from("worker_dashboard_view")
     .select("worker_id, status, created_at")
     .in("worker_id", workerIds);
 
   const stats = new Map<string, { pending: number; resolved: number }>();
-  workload?.forEach((row) => {
+  (workload as WorkloadRow[] | null)?.forEach((row) => {
     const current = stats.get(row.worker_id) ?? { pending: 0, resolved: 0 };
     if (ACTIVE_STATUSES.includes(row.status as ComplaintStatus)) {
       current.pending += 1;
@@ -62,7 +75,7 @@ export async function getServiceWorkers(): Promise<WorkerSummary[]> {
     stats.set(row.worker_id, current);
   });
 
-  return workers.map((worker) => {
+  return workerRecords.map((worker) => {
     const stat = stats.get(worker.id) ?? { pending: 0, resolved: 0 };
     return {
       id: worker.id,
@@ -94,6 +107,7 @@ export async function getWorkerDashboardPreview() {
   }
 
   const supabase = createSupabaseAdminClient();
+  type WorkerPreview = { id: string; full_name: string | null };
   const { data: worker } = await supabase
     .from("users")
     .select("id, full_name")
@@ -105,14 +119,24 @@ export async function getWorkerDashboardPreview() {
   if (!worker) {
     return null;
   }
+  const workerRecord = worker as WorkerPreview;
+
+  type AssignmentPreview = {
+    complaint_id: string;
+    status: ComplaintStatus;
+    building_name: string;
+    unit_number: string;
+    categories: string[] | null;
+    created_at: string;
+  };
 
   const { data: assignments } = await supabase
     .from("worker_dashboard_view")
     .select("complaint_id, status, building_name, unit_number, categories, created_at")
-    .eq("worker_id", worker.id)
+    .eq("worker_id", workerRecord.id)
     .order("created_at", { ascending: false });
 
-  const normalized = (assignments ?? []).map((assignment) => ({
+  const normalized = ((assignments ?? []) as AssignmentPreview[]).map((assignment) => ({
     id: assignment.complaint_id,
     status: assignment.status as ComplaintStatus,
     buildingName: assignment.building_name,
@@ -126,7 +150,7 @@ export async function getWorkerDashboardPreview() {
   const assignedToday = normalized.filter((complaint) => now - Date.parse(complaint.createdAt) < 1000 * 60 * 60 * 24);
 
   return {
-    worker: { id: worker.id, name: worker.full_name ?? "Service Worker" },
+    worker: { id: workerRecord.id, name: workerRecord.full_name ?? "Service Worker" },
     complaints: normalized,
     stats: {
       pending: pending.length,

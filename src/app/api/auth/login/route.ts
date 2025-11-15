@@ -20,11 +20,15 @@ export async function POST(request: Request) {
 
   const AUTH_USER_ID_COLUMN: keyof Database["public"]["Tables"]["users"]["Row"] = "auth_user_id";
   const IS_ACTIVE_COLUMN: keyof Database["public"]["Tables"]["users"]["Row"] = "is_active";
+  const authUserId = data.user.id;
+  if (!authUserId) {
+    return NextResponse.json({ error: "Unable to resolve user id." }, { status: 500 });
+  }
+  type AuthUserIdType = NonNullable<Database["public"]["Tables"]["users"]["Row"]["auth_user_id"]>;
 
-  const { data: profile } = await supabase
-    .from("users")
+  const { data: profile } = await (supabase.from("users") as any)
     .select("role")
-    .eq(AUTH_USER_ID_COLUMN, data.user.id)
+    .eq(AUTH_USER_ID_COLUMN, authUserId as AuthUserIdType)
     .eq(IS_ACTIVE_COLUMN, true)
     .maybeSingle();
 

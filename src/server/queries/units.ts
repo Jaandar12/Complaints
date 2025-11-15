@@ -19,6 +19,16 @@ export async function getUnitByPublicId(unitPublicId: string): Promise<UnitSumma
     return unitPublicId === mockUnit.publicId ? mockUnit : null;
   }
 
+  type UnitSelect = {
+    id: string;
+    unit_number: string;
+    tenant_name: string | null;
+    is_blocked: boolean;
+    public_id: string;
+    buildings: { name: string | null; image_url: string | null } | null;
+    floors: { floor_number: number | null } | null;
+  };
+
   const supabase = createSupabaseAdminClient();
   const { data: unitRow, error } = await supabase
     .from("units")
@@ -34,7 +44,7 @@ export async function getUnitByPublicId(unitPublicId: string): Promise<UnitSumma
     `
     )
     .eq("public_id", unitPublicId)
-    .single();
+    .single<UnitSelect>();
 
   if (error || !unitRow) {
     console.error("Failed to load unit", error);
@@ -68,26 +78,49 @@ export async function getUnitByPublicId(unitPublicId: string): Promise<UnitSumma
     .limit(1)
     .maybeSingle();
 
-  const complaint: Complaint | undefined = activeComplaint
+  type ComplaintSelect = {
+    id: string;
+    status: ComplaintStatus;
+    description: string | null;
+    tenant_name: string | null;
+    created_at: string;
+    updated_at: string;
+    complaint_category_links:
+      | {
+          complaint_categories: { id: string; name: string } | null;
+        }[]
+      | null;
+    complaint_status_logs:
+      | {
+          new_status: ComplaintStatus | null;
+          changed_at: string;
+          note: string | null;
+        }[]
+      | null;
+  };
+
+  const complaintRecord = activeComplaint as ComplaintSelect | null;
+
+  const complaint: Complaint | undefined = complaintRecord
     ? {
-        id: activeComplaint.id,
+        id: complaintRecord.id,
         unitId: unitRow.id,
         buildingName: unitRow.buildings?.name ?? "",
         unitNumber: unitRow.unit_number,
-        status: activeComplaint.status as ComplaintStatus,
+        status: complaintRecord.status,
         categories:
-          activeComplaint.complaint_category_links?.map((link) => ({
+          complaintRecord.complaint_category_links?.map((link) => ({
             id: link.complaint_categories?.id ?? "",
             name: link.complaint_categories?.name ?? "",
           })) ?? [],
-        description: activeComplaint.description ?? "",
-        tenantName: activeComplaint.tenant_name ?? undefined,
-        createdAt: activeComplaint.created_at,
-        updatedAt: activeComplaint.updated_at,
+        description: complaintRecord.description ?? "",
+        tenantName: complaintRecord.tenant_name ?? undefined,
+        createdAt: complaintRecord.created_at,
+        updatedAt: complaintRecord.updated_at,
         assignedWorkers: [],
-        agingSeconds: Math.floor((Date.now() - Date.parse(activeComplaint.created_at)) / 1000),
+        agingSeconds: Math.floor((Date.now() - Date.parse(complaintRecord.created_at)) / 1000),
         timeline:
-          activeComplaint.complaint_status_logs
+          complaintRecord.complaint_status_logs
             ?.sort((a, b) => Date.parse(a.changed_at) - Date.parse(b.changed_at))
             .map((log) => ({
               status: (log.new_status as ComplaintStatus) ?? "NEW",
@@ -105,7 +138,7 @@ export async function getUnitByPublicId(unitPublicId: string): Promise<UnitSumma
     unitNumber: unitRow.unit_number,
     tenantName: unitRow.tenant_name ?? undefined,
     isBlocked: unitRow.is_blocked,
-    imageUrl: unitRow.buildings?.image_url ?? null,
+    imageUrl: unitRow.buildings?.image_url ?? undefined,
     activeComplaint: complaint ?? null,
     canSubmit: !unitRow.is_blocked && !complaint,
   };

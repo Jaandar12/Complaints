@@ -23,6 +23,15 @@ export async function getBuildingSummaries(): Promise<BuildingSummary[]> {
   }
 
   const supabase = createSupabaseAdminClient();
+  type BuildingSelect = {
+    id: string;
+    name: string;
+    address: string;
+    image_url: string | null;
+    units: { id: string }[];
+    complaints: { status: string }[];
+  };
+
   const { data, error } = await supabase
     .from("buildings")
     .select(`
@@ -39,14 +48,13 @@ export async function getBuildingSummaries(): Promise<BuildingSummary[]> {
     return [];
   }
 
-  return (
-    data?.map((building) => ({
-      id: building.id,
-      name: building.name,
-      address: building.address,
-      imageUrl: building.image_url,
-      unitCount: building.units?.length ?? 0,
-      activeComplaints: building.complaints?.filter((c) => ACTIVE_STATUSES.includes(c.status)).length ?? 0,
-    })) ?? []
-  );
+  const records = (data ?? []) as BuildingSelect[];
+  return records.map((building) => ({
+    id: building.id,
+    name: building.name,
+    address: building.address,
+    imageUrl: building.image_url,
+    unitCount: building.units?.length ?? 0,
+    activeComplaints: building.complaints?.filter((c) => ACTIVE_STATUSES.includes(c.status)).length ?? 0,
+  }));
 }

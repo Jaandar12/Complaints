@@ -4,6 +4,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/env";
 import { mockComplaint, mockComplaintsFeed } from "@/lib/mock-data";
 import { ComplaintStatus } from "@/lib/types";
+import type { Database } from "@/lib/types/database";
 
 type DashboardMetrics = {
   newComplaints: number;
@@ -31,11 +32,13 @@ export async function getAdminDashboardMetrics(): Promise<DashboardMetrics> {
     return { newComplaints: 0, averageResolutionHours: 0, blockedUnits: 0, reopenRate: 0 };
   }
 
+  const metrics = (data ?? {}) as Record<string, number>;
+
   return {
-    newComplaints: Number(data?.newComplaints ?? 0),
-    averageResolutionHours: Number(data?.averageResolutionHours ?? 0),
-    blockedUnits: Number(data?.blockedUnits ?? 0),
-    reopenRate: Number(data?.reopenRate ?? 0),
+    newComplaints: Number(metrics.newComplaints ?? 0),
+    averageResolutionHours: Number(metrics.averageResolutionHours ?? 0),
+    blockedUnits: Number(metrics.blockedUnits ?? 0),
+    reopenRate: Number(metrics.reopenRate ?? 0),
   };
 }
 
@@ -85,12 +88,21 @@ export async function getComplaintDetail(complaintId: string): Promise<Complaint
     console.error("Failed to fetch complaint detail", error);
     return null;
   }
+  type ComplaintRow = Database["public"]["Tables"]["complaints"]["Row"];
+  const complaintRecord = complaint as ComplaintRow;
+
+  type UnitDetail = {
+    unit_number: string;
+    tenant_name: string | null;
+    floors: { floor_number: number | null } | null;
+    buildings: { name: string | null } | null;
+  };
 
   const [{ data: unit }, { data: categories }, { data: assignments }, { data: statusLogs }] = await Promise.all([
     supabase
       .from("units")
       .select("unit_number, tenant_name, floors(floor_number), buildings(name)")
-      .eq("id", complaint.unit_id)
+      .eq("id", complaintRecord.unit_id)
       .single(),
     supabase
       .from("complaint_category_links")
@@ -107,29 +119,40 @@ export async function getComplaintDetail(complaintId: string): Promise<Complaint
       .order("changed_at", { ascending: true }),
   ]);
 
+  type StatusLogRow = {
+    new_status: ComplaintStatus | null;
+    changed_at: string;
+    note: string | null;
+    users: { full_name: string | null } | null;
+  };
   const timeline =
-    statusLogs?.map((log) => ({
-      status: (log.new_status as ComplaintStatus) ?? "NEW",
+    (statusLogs as StatusLogRow[] | null)?.map((log) => ({
+      status: log.new_status ?? "NEW",
       changedAt: log.changed_at,
       note: log.note ?? undefined,
       actor: log.users?.full_name ?? undefined,
     })) ?? [];
 
+  const unitRecord = (unit ?? null) as UnitDetail | null;
+
+  type CategoryRow = { complaint_categories: { name: string | null } | null };
+  type AssignmentRow = { assigned_at: string; users: { full_name: string | null } | null };
+
   return {
-    id: complaint.id,
-    status: complaint.status as ComplaintStatus,
-    buildingName: unit?.buildings?.name ?? "",
-    unitNumber: unit?.unit_number ?? "",
-    tenantName: complaint.tenant_name ?? undefined,
-    floorNumber: unit?.floors?.floor_number ?? undefined,
-    description: complaint.description,
-    categories: categories?.map((c) => c.complaint_categories?.name ?? "").filter(Boolean) ?? [],
+    id: complaintRecord.id,
+    status: complaintRecord.status as ComplaintStatus,
+    buildingName: unitRecord?.buildings?.name ?? "",
+    unitNumber: unitRecord?.unit_number ?? "",
+    tenantName: complaintRecord.tenant_name ?? undefined,
+    floorNumber: unitRecord?.floors?.floor_number ?? undefined,
+    description: complaintRecord.description,
+    categories: (categories as CategoryRow[] | null)?.map((c) => c.complaint_categories?.name ?? "").filter(Boolean) ?? [],
     assignments:
-      assignments?.map((assignment) => ({
+      (assignments as AssignmentRow[] | null)?.map((assignment) => ({
         workerName: assignment.users?.full_name ?? "Unassigned",
         assignedAt: assignment.assigned_at,
       })) ?? [],
     timeline,
-    reportedAt: timeline[0]?.changedAt ?? complaint.created_at,
+    reportedAt: timeline[0]?.changedAt ?? complaintRecord.created_at,
   };
 }

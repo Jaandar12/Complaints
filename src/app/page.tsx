@@ -18,12 +18,18 @@ export default function Home() {
             route work orders, and close the feedback loop with analytics-grade visibility.
           </p>
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Button asChild className="w-48">
-              <Link href="/unit/demo-unit">Preview Tenant Portal</Link>
-            </Button>
-            <Button asChild variant="secondary" className="w-48 bg-white/10 text-white ring-1 ring-white/30 hover:bg-white/20">
-              <Link href="/admin">Launch Admin Console</Link>
-            </Button>
+            <Link
+              href="/unit/demo-unit"
+              className="w-48 rounded-full bg-blue-600 px-6 py-3 text-center text-sm font-semibold text-white shadow transition hover:bg-blue-500"
+            >
+              Preview Tenant Portal
+            </Link>
+            <Link
+              href="/admin"
+              className="w-48 rounded-full border border-white/30 bg-white/10 px-6 py-3 text-center text-sm font-semibold text-white shadow transition hover:bg-white/20"
+            >
+              Launch Admin Console
+            </Link>
           </div>
         </div>
         <div className="grid w-full gap-6 md:grid-cols-2">
